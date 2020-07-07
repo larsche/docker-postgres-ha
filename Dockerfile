@@ -6,7 +6,6 @@ RUN set -ex; \
 		apt-get install -y --no-install-recommends \
 			gnupg \
 			dirmngr \
-            wget\
 		; \
 		rm -rf /var/lib/apt/lists/*; \
 	fi
@@ -37,6 +36,11 @@ RUN set -eux; \
 	gosu --version; \
 	gosu nobody true
 
+RUN set -eux; \
+	apt-get update; apt-get install -y --no-install-recommends locales; rm -rf /var/lib/apt/lists/*; \
+	localedef -i en_US -c -f UTF-8 -A /usr/share/locale/locale.alias en_US.UTF-8
+ENV LANG en_US.utf8
+
 RUN set -ex; \
 # pub   4096R/ACCC4CF8 2011-10-13 [expires: 2019-07-02]
 #       Key fingerprint = B97B 0AFC AA1A 47F0 44F2  44A0 7FCC 7D46 ACCC 4CF8
@@ -50,14 +54,17 @@ RUN set -ex; \
 	apt-key list
 
 # RUN wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
-RUN dpkgArch="$(dpkg --print-architecture)"; \ 
-    echo "deb http://apt.postgresql.org/pub/repos/apt/ bionic-pgdg main > sudo tee  /etc/apt/sources.list.d/pgdg.list; 
+RUN echo "deb http://apt.postgresql.org/pub/repos/apt/ bionic-pgdg main" >  /etc/apt/sources.list.d/pgdg.list; \
+    apt update && apt-get install -y --no-install-recommends postgresql-common;\
+	 sed -ri 's/#(create_main_cluster) .*$/\1 = false/' /etc/postgresql-common/createcluster.conf; \
+     DEBIAN_FRONTEND=noninteractive apt install --no-install-recommends -y postgresql-$PG_MAJOR
 
+# RUN apt-get clean all
+ENV PATH $PATH:/usr/lib/postgresql/$PG_MAJOR/bin
+ENV PGDATA /var/lib/postgresql/data
+# this 777 will be replaced by 700 at runtime (allows semi-arbitrary "--user" values)
+RUN mkdir -p "$PGDATA" && chown -R postgres:postgres "$PGDATA" && chmod 777 "$PGDATA"
+RUN  
 
-RUN  apt update && apt-get install -y --no-install-recommends postgresql-common;\
-     apt install --no-install-recommends -y postgresql-$PG_MAJOR
-
-RUN apt-get clean all
-
-CMD tail -f /dev/null
+CMD /bin/bash
                            
